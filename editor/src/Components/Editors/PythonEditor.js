@@ -10,90 +10,96 @@ const JavaScriptEditor = () => {
 
   useEffect(() => {
     const workerScript = `
-      self.onmessage = async (e) => {
-        if (e.data.writable) {
-          const writable = e.data.writable;
-          const writer = writable.getWriter();
-          
-          try {
-            // Load SystemJS and AMD Extra
-            await eval(await (await fetch('https://cdnjs.cloudflare.com/ajax/libs/systemjs/6.14.3/system.min.js')).text());
-            await eval(await (await fetch('https://cdnjs.cloudflare.com/ajax/libs/systemjs/6.14.3/extras/amd.min.js')).text());
+    self.onmessage = async (e) => {
+      try {
+
+        // Load SystemJS and AMD Extra
+        await eval(await (await fetch('https://cdnjs.cloudflare.com/ajax/libs/systemjs/6.14.3/system.min.js')).text());
+        await eval(await (await fetch('https://cdnjs.cloudflare.com/ajax/libs/systemjs/6.14.3/extras/amd.min.js')).text());
+
+        // Define an import map
+        const importMap = {
+          'babel': 'https://unpkg.com/@babel/standalone/babel.min.js',
+        };
+
+        // Override System.resolve to use the import map
+        const originalResolve = System.resolve;
+        System.resolve = async function (specifier, parentURL) {
+          return importMap[specifier] || originalResolve.call(this, specifier, parentURL);
+        };
+
+        // Import React and ReactDOMServer using SystemJS
+        const Babel = await System.import('babel');
+
+        // Transform the received code using Babel
+        //var input = e.data.code;
+        const input = \`const profile = (<Button>{ 1+3 }</Button>);\`;
+
+        const transformedCode = Babel.transform(input, { presets: ['react'] }).code;
+console.log(transformedCode);
+
+
+        // Create an HTML template with the rendered component
+        const htmlTemplate = \`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>React App</title>
+              <link href="https://cdnjs.cloudflare.com/ajax/libs/antd/5.14.0/antd.min.css" rel="stylesheet">
+              <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
+              <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+              
+              <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.10/dayjs.min.js"></script>
+              <script src="https://cdnjs.cloudflare.com/ajax/libs/antd/5.14.0/antd.min.js"></script>
+              
+            </head>
+            <body>xxxxx
+              <div id="app"></div>
+              <script defer>
+              document.addEventListener('DOMContentLoaded', () => {
+                const Button = antd.Button; // Accessing Button directly from antd
+        
             
-            // Define an import map
-            const importMap = {
-              'react': 'https://unpkg.com/react@18.2.0/umd/react.production.min.js',
-              'react-dom/server': 'https://unpkg.com/react-dom@18.2.0/umd/react-dom-server.browser.production.min.js'
-            };
 
-            // Override System.resolve to use the import map
-            const originalResolve = System.resolve;
-            System.resolve = async function (specifier, parentURL) {
-              return importMap[specifier] || originalResolve.call(this, specifier, parentURL);
-            };
+              \${transformedCode}
+              
+              const root = ReactDOM.createRoot(
+                document.getElementById('app')
+              );
 
-            // Import React and ReactDOMServer using SystemJS
-            const React = await System.import('react');
-            const ReactDOMServer = await System.import('react-dom/server');
-
-            // Process the received code
-            const element = React.createElement('div', { className: 'test' }, 'Test Element');
-            const stream = await ReactDOMServer.renderToReadableStream(element);
-
-            const reader = stream.getReader();
-
-            // Function to read each chunk and write to the writable stream
-            const processStream = () => {
-              reader.read().then(({ done, value }) => {
-                if (done) {
-                  writer.close();
-                  return;
-                }
-                writer.write(value); // Write the chunk to the writable stream
-                processStream(); // Continue processing the stream
-              }).catch(error => {
-                console.error('Error reading the stream:', error);
-                writer.write(new TextEncoder().encode('Stream read error: ' + error.message));
-                writer.close();
-              });
-            };
-    
-            processStream();
-
-          } catch (error) {
-            console.error('Error in worker:', error);
-            writer.write(encoder.encode('Error: ' + error.message));
-            writer.close();
-          }
-        }
-      };
+              root.render(profile);
+              console.log(root);
+            });
+              </script>
+            </body>
+          </html>
+        \`;
+        console.log('HTML template:', htmlTemplate);
+        // Post the complete HTML back to the main thread
+        self.postMessage(htmlTemplate);
+      } catch (error) {
+        console.error('Error in worker:', error);
+        self.postMessage({ error: error.message });
+      }
+    };
     `;
 
-    // Create a blob from the worker script
+    // Create a blob from the worker script and initialize the worker
     const blob = new Blob([workerScript], { type: 'application/javascript' });
     const workerUrl = URL.createObjectURL(blob);
-
-    // Initialize the worker
     const newWorker = new Worker(workerUrl);
     setWorker(newWorker);
 
-    // Create a pair of streams
-    const { readable, writable } = new TransformStream();
-
-    // Transfer the writable stream to the worker
-    newWorker.postMessage({ writable }, [writable]);
-
-    // Read from the readable stream
-    const reader = readable.getReader();
-    const decoder = new TextDecoder();
-    let result;
-    reader.read().then(function processText({ done, value }) {
-      if (done) {
-        return;
+    newWorker.onmessage = (e) => {
+      if (e.data) {
+        
+        setOutput(e.data);
+      } else if (e.data.error) {
+        console.error("Error from worker:", e.data.error);
       }
-      setOutput(prev => prev + decoder.decode(value, { stream: true }));
-      return reader.read().then(processText);
-    });
+    };
 
     return () => {
       newWorker.terminate();
@@ -123,6 +129,7 @@ const JavaScriptEditor = () => {
       <Button onClick={runCode}>Run</Button>
       <div>
         <ReactJson src={{ output }} />
+        <iframe title="React App Output" width="100%" height="500" srcDoc={output}></iframe>
       </div>
     </div>
   );
