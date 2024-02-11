@@ -31,8 +31,14 @@ const JavaScriptEditor = () => {
       const moduleCode = await response.text();
       context.evalCodeAsync(moduleCode)
 
-      const result = await context.evalCodeAsync(code);
+      //const result = await context.evalCodeAsync(code);
   
+      const result = await context.evalCodeAsync(`
+        const e = React.createElement;
+        const element = e('div', { className: 'test' }, 'Test Element');
+        globalThis.testElement = element;
+      `);
+
       context.unwrapResult(result).dispose();
       const html = context.getProp(context.global, "testElement");
       setOutput(html.consume(context.dump));
