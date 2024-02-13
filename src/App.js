@@ -3,6 +3,7 @@ import { Button, Menu, Dropdown, Collapse } from 'antd';
 import { PlusOutlined, DeleteOutlined, ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
 import './App.css';
 import JavaScriptEditor from './Components/Editors/JavaScriptEditor';
+import PimcoreStudioComponentsEditor from './Components/Editors/PimcoreStudioComponentsEditor';
 import PythonEditor from './Components/Editors/PythonEditor';
 import PhpEditor from './Components/Editors/PhpEditor';
 
@@ -21,6 +22,7 @@ function EditorHeader({ editor, onRemove, onMoveUp, onMoveDown, index, total, ad
   const menu = (
     <Menu onClick={(e) => handleButtonClick(e.domEvent, () => addEditor(e.key, index + 1))}>
       <Menu.Item key="JavaScriptEditor">JavaScript Editor</Menu.Item>
+      <Menu.Item key="PimcoreStudioComponentsEditor">JavaScript Editor</Menu.Item>
       <Menu.Item key="PythonEditor">Python Editor</Menu.Item>
       <Menu.Item key="PhpEditor">PHP Editor</Menu.Item>
     </Menu>
@@ -72,6 +74,8 @@ function App() {
     switch (editor.type) {
       case 'JavaScriptEditor':
         return <JavaScriptEditor defaultValue={editor.content} />;
+      case 'PimcoreStudioComponentsEditor':
+        return <PimcoreStudioComponentsEditor defaultValue={editor.content} />;        
       case 'PythonEditor':
         return <PythonEditor defaultValue={editor.content} />;
       case 'PhpEditor':
@@ -84,6 +88,7 @@ function App() {
   const menu = (
     <Menu onClick={({ key }) => addEditor(key)}>
       <Menu.Item key="JavaScriptEditor">JavaScript Editor</Menu.Item>
+      <Menu.Item key="PimcoreStudioComponentsEditor">Pimcore Studio Components Editor</Menu.Item>
       <Menu.Item key="PythonEditor">Python Editor</Menu.Item>
       <Menu.Item key="PhpEditor">PHP Editor</Menu.Item>
     </Menu>
